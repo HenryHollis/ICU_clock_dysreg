@@ -7,13 +7,9 @@ library(limma)
 
 in_dir = "~/Documents/R/ClockCorr2/GTEx_counts/"
 setwd(in_dir)
-counts_dir = "~/Documents/R/ClockCorr2/2TMMNormedCountsEdgeR/"
-outfile_dir = "~/Documents/R/ClockCorr2/diff_expr_tables2/"
+counts_dir = "~/Documents/R/GTEx_private_data/TMMNormedCountsEdgeR/"
+outfile_dir = "~/Documents/R/ClockCorr2/diff_expr_tables/"
 gtex_files =gtex_files=list.files(pattern = "*.csv")
-gtex_files=gtex_files[-c(7,8,9,10,11, 12, 13, 14, 15, 16, 17,
-                         18, 19, 20,23, 24, 25, 26, 32, 35,
-                         36, 39, 42, 43,44,48,49,50,53,54 )] #tissues don't meet inclusion criteria
-
 
 gene_list = c("PER3" , "CIART" ,"NPAS2", "PER2",  "NR1D2", "CLOCK" ,"ARNTL", "CRY2" , "CRY1",  "PER1" , "NR1D1" ,"DBP","TEF")
 
@@ -25,19 +21,24 @@ get_tissue_name = function(str){
 
 collate_data = function(file_name){
   tissue_data = read.csv(file_name)                           # read csv
-  tissue_data =
-    select(tissue_data, -Name) %>%
+  rm_rows = which(!(tissue_data$Description %in% gene_list))   # get row indices of throwaway genes
+  small_tissue_data = tissue_data
+  
+  small_tissue_data =
+    select(small_tissue_data, -Name) %>%
     unite("Info", Description,Info, sep = "", remove = T)
-  tissue_data = t(tissue_data)
+  rm(tissue_data)
   
-  if(dim(tissue_data)[1] <= 1){return(NA)}
+  small_tissue_data = t(small_tissue_data)
   
-  colnames(tissue_data) = tissue_data[1, ]
-  tissue_data = as_tibble(tissue_data[-1, ])
-  #tissue_data = filter(tissue_data, (SMCENTER =='C1' | SMCENTER == 'B1') )
-  if(dim(tissue_data)[1]==0){return(NA)}   #This is triggered if the sample has multiple testing centers listed for SMCENTER
+  if(dim(small_tissue_data)[1] <= 1){return(NA)}
   
-  return(tissue_data)
+  colnames(small_tissue_data) = small_tissue_data[1, ]
+  small_tissue_data = as_tibble(small_tissue_data[-1, ])
+  small_tissue_data = filter(small_tissue_data, (SMCENTER =='C1' | SMCENTER == 'B1') )
+  if(dim(small_tissue_data)[1]==0){return(NA)}   #This is triggered if the sample has multiple testing centeres listed for SMCENTER
+  
+  return(small_tissue_data)
   
 }
 
@@ -81,14 +82,14 @@ get_coldata = function(collated_data){
   return(subjects)
 }
 
-tissue_diff_expr = function(file, min_in_group=50, write = F){
+tissue_diff_expr = function(file, min_in_group=50, plot = F, write = F){
   tiss_name = get_tissue_name(file)
   print(tiss_name)
   tiss_name = str_replace_all(tiss_name, fixed(" "), "")
   start = Sys.time()
   data = collate_data(file)
   coldata = get_coldata(data)
-  rm_subjects = which(!(coldata$dthhrdy %in% c(0, 1, 2) & coldata$center %in% c("B1", "C1")))
+  rm_subjects = which(!(coldata$dthhrdy %in% c(0, 1, 2)))
   
   
   all_coldata = coldata
@@ -104,21 +105,13 @@ tissue_diff_expr = function(file, min_in_group=50, write = F){
   cts = get_counts_mat(data)
   
   if(is.na(cts)){return(NA)}
+  
+  all(rownames(all_coldata) %in% colnames(cts))
+  all(rownames(all_coldata) == colnames(cts))
   d0 <- DGEList(cts)
   
   
-  #######norming counts to TMMS#####
-  keep <- rowSums(cpm(d0)>1) >= 2 #we're only keeping a gene if it has a cpm of 100 or greater for at least two samples
-  d <- d0[keep,]
-  d = d0
-  tmm <- calcNormFactors(d, method = "TMM")
-  if(write){
-   setwd(counts_dir)
-   write.table(tmm, file = paste0(tiss_name,"_TMMcounts.csv"), row.names = T, col.names = NA, sep = ",", quote = F)
-   setwd(in_dir)
-  }
-  
-  ######start differential expr######
+  # group <- interaction(coldata$center, coldata$dthhrdy)
   center = coldata$center
   dthhrdy = coldata$dthhrdy
   age = coldata$AGE
@@ -131,12 +124,24 @@ tissue_diff_expr = function(file, min_in_group=50, write = F){
     design <- model.matrix(~center + age + sex + dthhrdy)  #design matrix
   }
   
-  cts = cts[,-rm_subjects]
- # d0 <- DGEList(cts, )
-  #keep <- filterByExpr(d0, group=dthhrdy)
-  #d <- d0[keep, , keep.lib.sizes=FALSE]
-  y <- estimateDisp(d[, -rm_subjects], design)
+  # keep <- rowSums(cpm(d0)>1) >= 2
+  # d <- d0[keep,]
+  # tmm <- calcNormFactors(d, method = "TMM")
+  # if(write){
+  #   setwd(counts_dir)
+  #   write.table(tmm, file = paste0(tiss_name,"_TMMcounts.csv"), row.names = T, col.names = NA, sep = ",", quote = F)
+  #   setwd(in_dir)
+  # }
   
+  cts = cts[,-rm_subjects]
+  d0 <- DGEList(cts)
+  keep <- filterByExpr(d0, group=dthhrdy)
+  d <- d0[keep, , keep.lib.sizes=FALSE]
+  y <- estimateDisp(d, design)
+  
+  #plotBCV(d)
+  # fit <- glmFit(d, design)
+  # lrt <- glmLRT(fit, coef=5)
   fit = glmQLFit(y, design)
   if(single_sex){
     qlf = glmQLFTest(fit, coef=4)
@@ -156,5 +161,4 @@ tissue_diff_expr = function(file, min_in_group=50, write = F){
   return(top.table)
 }
 
-sapply(gtex_files[2:25], tissue_diff_expr, write= T)
-
+sapply(gtex_files[1], tissue_diff_expr, write= F)
