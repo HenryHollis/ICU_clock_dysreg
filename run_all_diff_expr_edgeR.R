@@ -12,8 +12,8 @@ cl <- makePSOCKcluster(2)
 registerDoParallel(cl)
 in_dir = "~/Documents/R/ClockCorr2/GTEx_counts/"
 setwd(in_dir)
-counts_dir = "~/Documents/R/ClockCorr2/TMMNormedCountsEdgeR_clockcorr3/"
-outfile_dir = "~/Documents/R/ClockCorr2/diff_expr_tables2/"
+counts_dir = "~/Documents/R/ClockCorr2/TMMNormedCountsEdgeR/"
+outfile_dir = "~/Documents/R/ClockCorr2/diff_expr_tables/"
 gtex_files =gtex_files=list.files(pattern = "*.csv")
 gtex_files=gtex_files[-c(7,8,9,10,11, 12, 13, 14, 15, 16, 17,
                          18, 19, 20,23, 24, 25, 26, 32, 35,
