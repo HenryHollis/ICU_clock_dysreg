@@ -6,11 +6,11 @@ library(tidyverse)
 library(doParallel)
 
 BHthreshold = 0.05
-LFCcutoff = F      #change to T to enforce log fold change of 0.58
-num_tissues = 25   #the number of tissues required to be present in for ubiq lists
+LFCcutoff = T      #change to T to enforce log fold change of 0.58
+num_tissues = 10   #the number of tissues required to be present in for ubiq lists
 
-in_dir = "~/Documents/R/ClockCorr2/diff_expr_tables/"
-out = "~/Documents/R/ClockCorr2/diff_expr_tables/LFC_FDR_tables/"
+in_dir = "~/Documents/R/ClockCorr2/diff_expr_tables2/"
+out = "~/Documents/R/ClockCorr2/diff_expr_tables2/LFC_FDR_tables2/"
 setwd(in_dir)
 
 registerDoParallel(cores = 4)
@@ -87,6 +87,7 @@ ubiq_FDR = generate_summary_tables(3, ubiq_list)
 #write.table(ubiq_FDR, "ubiq_FDR.csv", sep=',', quote=F, col.names = NA)
 matrix_clock_LFC = generate_summary_tables(2, gene_list)
 #write.table(matrix_clock_LFC, "matrix_clock_LFC.csv", sep=',', quote=F, col.names = NA)
+
 matrix_clock_FDR = generate_summary_tables(2, gene_list)
 #write.table(matrix_clock_FDR, "matrix_clock_FDR.csv", sep=',', quote=F, col.names = NA)
 
